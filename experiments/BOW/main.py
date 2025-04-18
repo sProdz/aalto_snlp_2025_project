@@ -10,9 +10,16 @@ import os # To check for file existence
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+import csv
+import yaml
+import sys # Import sys
 
-
-# Import custom classes from bow.py
+# Import custom classes from bow.py using relative import
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Add the script's directory to sys.path if it's not already there
+# This helps ensure the relative import works reliably
+if script_dir not in sys.path:
+    sys.path.append(script_dir)
 from bow import TextPreprocessor, BoWClusterer, TfidfClusterer, reduce_and_visualize
 
 # In[3]:
@@ -29,7 +36,7 @@ import yaml
 from bow import TextPreprocessor, BoWClusterer, TfidfClusterer, reduce_and_visualize
 
 # --- Load Configuration from YAML ---
-CONFIG_FILE = 'experiment.yaml' # <--- Define path to config file
+CONFIG_FILE = os.path.join(script_dir, 'experiment.yaml') # <--- Use path relative to script
 try:
     with open(CONFIG_FILE, 'r') as f:
         config = yaml.safe_load(f)
@@ -63,12 +70,19 @@ INTERMEDIATE_DIR = config['intermediate_dir']
 # For simplicity, assuming we might base intermediate names on the raw file or a specific key
 # Let's use the intermediate dir directly:
 PREPROCESSED_FILE = os.path.join(INTERMEDIATE_DIR, f"data{config['preprocessed_file_suffix']}")
-BOW_RESULTS_FILE = os.path.join(INTERMEDIATE_DIR, f"data{config['bow_results_suffix']}")
-TFIDF_RESULTS_FILE = os.path.join(INTERMEDIATE_DIR, f"data{config['tfidf_results_suffix']}")
 
+# Get BoW suffix safely, defaulting to None if commented out
+bow_suffix = config.get('bow_results_suffix', None)
+BOW_RESULTS_FILE = os.path.join(INTERMEDIATE_DIR, f"data{bow_suffix}") if bow_suffix else None
 
-# Create directory for intermediate files if it doesn't exist
-os.makedirs(INTERMEDIATE_DIR, exist_ok=True) # <--- Use INTERMEDIATE_DIR
+# Construct TF-IDF path using the dedicated key from YAML
+TFIDF_RESULTS_FILE = config['tfidf_results_suffix'] # Path is now absolute from YAML
+
+# Create intermediate directory if it doesn't exist (should be ../../data/BOW_intermediate now)
+os.makedirs(INTERMEDIATE_DIR, exist_ok=True)
+# Also create the directory for the final TF-IDF results if it doesn't exist
+tfidf_parent_dir = os.path.dirname(TFIDF_RESULTS_FILE)
+os.makedirs(tfidf_parent_dir, exist_ok=True)
 
 N_CLUSTERS = config['n_clusters']
 N_SVD_COMPONENTS = config['n_svd_components']
@@ -147,51 +161,56 @@ print(df_processed[['quote', 'processed_quote']].head())
 
 # --- Stage 2: BoW Clustering and t-SNE ---
 
-if os.path.exists(BOW_RESULTS_FILE):
-    print(f"Loading BoW results from {BOW_RESULTS_FILE}...")
-    df_bow = pd.read_parquet(BOW_RESULTS_FILE)
-    print("Loaded.")
-    # Recreate necessary objects if needed later (e.g., for sampling cluster centers)
-    # bow_clusterer = BoWClusterer(n_clusters=N_CLUSTERS)
-    # bow_clusterer.fit(df_bow['processed_quote']) # Need to re-fit to get matrix/centers if not saved
-    # Or load saved clusterer object if you implement saving/loading for it
-else:
-    print(f"BoW results file {BOW_RESULTS_FILE} not found. Running BoW steps...")
-    # Use the DataFrame from the previous stage
-    df_bow = df_processed.copy()
+df_bow = None # Initialize df_bow to None
 
-    # Initialize and fit BoWClusterer
-    print("Initializing and fitting BoWClusterer...")
-    bow_clusterer = BoWClusterer(n_clusters=N_CLUSTERS,
-                                 vectorizer_params=VECTORIZER_PARAMS) 
-    bow_clusterer.fit(df_bow['processed_quote'])
-    df_bow['bow_cluster'] = bow_clusterer.labels_
-    print("BoW clustering complete.")
-
-    # Reduce dimensions
-    print("Reducing BoW dimensions using SVD+t-SNE...")
-    bow_embedding = reduce_and_visualize(
-        matrix=bow_clusterer.bow_matrix_,
-        labels=df_bow['bow_cluster'],
-        title_prefix="BoW",
-        method='tsne_svd',
-        n_svd_components=N_SVD_COMPONENTS
-    )
-
-    if bow_embedding is not None:
-        df_bow['tsne_bow_1'] = bow_embedding[:, 0]
-        df_bow['tsne_bow_2'] = bow_embedding[:, 1]
-        print("BoW t-SNE coordinates added.")
+if BOW_RESULTS_FILE: # Only run if BoW output is configured
+    if os.path.exists(BOW_RESULTS_FILE):
+        print(f"Loading BoW results from {BOW_RESULTS_FILE}...")
+        df_bow = pd.read_parquet(BOW_RESULTS_FILE)
+        print("Loaded.")
+        # Recreate necessary objects if needed later (e.g., for sampling cluster centers)
+        # bow_clusterer = BoWClusterer(n_clusters=N_CLUSTERS)
+        # bow_clusterer.fit(df_bow['processed_quote']) # Need to re-fit to get matrix/centers if not saved
+        # Or load saved clusterer object if you implement saving/loading for it
     else:
-        print("Warning: BoW dimensionality reduction failed.")
+        print(f"BoW results file {BOW_RESULTS_FILE} not found. Running BoW steps...")
+        # Use the DataFrame from the previous stage
+        df_bow = df_processed.copy() # Start BoW processing from processed data
 
-    # Save the result
-    print(f"Saving BoW results (including t-SNE) to {BOW_RESULTS_FILE}...")
-    df_bow.to_parquet(BOW_RESULTS_FILE, index=False)
-    print("Saved.")
+        # Initialize and fit BoWClusterer
+        print("Initializing and fitting BoWClusterer...")
+        bow_clusterer = BoWClusterer(n_clusters=N_CLUSTERS,
+                                     vectorizer_params=VECTORIZER_PARAMS)
+        bow_clusterer.fit(df_bow['processed_quote'])
+        df_bow['bow_cluster'] = bow_clusterer.labels_
+        print("BoW clustering complete.")
 
-print(f"Shape after BoW stage: {df_bow.shape}")
-print(df_bow[['processed_quote', 'bow_cluster', 'tsne_bow_1', 'tsne_bow_2']].head())
+        # Reduce dimensions
+        print("Reducing BoW dimensions using SVD+t-SNE...")
+        bow_embedding = reduce_and_visualize(
+            matrix=bow_clusterer.bow_matrix_,
+            labels=df_bow['bow_cluster'],
+            title_prefix="BoW",
+            method='tsne_svd',
+            n_svd_components=N_SVD_COMPONENTS
+        )
+
+        if bow_embedding is not None:
+            df_bow['tsne_bow_1'] = bow_embedding[:, 0]
+            df_bow['tsne_bow_2'] = bow_embedding[:, 1]
+            print("BoW t-SNE coordinates added.")
+        else:
+            print("Warning: BoW dimensionality reduction failed.")
+
+        # Save the result
+        print(f"Saving BoW results (including t-SNE) to {BOW_RESULTS_FILE}...")
+        df_bow.to_parquet(BOW_RESULTS_FILE, index=False)
+        print("Saved.")
+
+    print(f"Shape after BoW stage: {df_bow.shape}")
+    print(df_bow[['processed_quote', 'bow_cluster', 'tsne_bow_1', 'tsne_bow_2']].head())
+else:
+    print("Skipping BoW stage as 'bow_results_suffix' is not configured.")
 
 
 # In[ ]:
@@ -206,9 +225,11 @@ if os.path.exists(TFIDF_RESULTS_FILE):
     # Again, optionally recreate/load clusterer object if needed
 else:
     print(f"TF-IDF results file {TFIDF_RESULTS_FILE} not found. Running TF-IDF steps...")
-    # Load the result from the PREVIOUS stage (BoW results file)
-    # This ensures we add TF-IDF columns to the DataFrame that already has BoW results
-    df_final = df_bow.copy() # Start from the df that includes BoW results
+    # Load the result from the PREVIOUS completed stage
+    # If BoW was skipped, df_bow will be None, so use df_processed
+    # Otherwise, use df_bow as it contains the intermediate BoW results
+    df_start_tfidf = df_bow.copy() if df_bow is not None else df_processed.copy()
+    df_final = df_start_tfidf
 
     # Initialize and fit TfidfClusterer
     print("Initializing and fitting TfidfClusterer...")
