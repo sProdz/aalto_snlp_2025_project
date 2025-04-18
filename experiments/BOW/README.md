@@ -1,95 +1,108 @@
-# Goodreads Quote Clustering Pipeline & Query Engine
+# Experiment: Goodreads Quote Clustering (BoW & TF-IDF)
 
-This project processes a dataset of Goodreads quotes, performs text cleaning, and applies Bag-of-Words (BoW) and TF-IDF based K-Means clustering to group similar quotes. It also generates t-SNE embeddings for visualization.
+## Context within `aalto_snlp_2025_project`
 
-## Pipeline Overview
+This directory contains the code and configuration for a specific experiment focused on clustering Goodreads quotes using classical NLP vectorization techniques: Bag-of-Words (BoW) and Term Frequency-Inverse Document Frequency (TF-IDF).
 
-The main processing logic is in `main.py`. It reads configuration from `experiment.yaml` and performs the following stages:
+This experiment is part of the larger `aalto_snlp_2025_project`, which explores various methods for quote analysis and retrieval. It sits alongside other experiments in the `experiments/` directory, such as those potentially using `word2vec` or `BERT` embeddings (`experiments/word2vec/`, `experiments/BERT/`). The outputs of this experiment (like processed data, cluster assignments, and trained vectorizers) might be used for comparison with other methods or potentially ingested into downstream systems like the Qdrant vector database (see `qdrant_ingest.py` in the root).
 
-1.  **Configuration Loading:** Reads parameters like file paths, number of clusters, SVD components, etc., from `experiment.yaml`.
-2.  **Preprocessing:** Loads raw data (defined in `raw_data_file` in the config), cleans the quote text (removing punctuation, stopwords, lemmatizing using `TextPreprocessor` from `bow.py`), and saves the preprocessed data and the preprocessor object.
-3.  **BoW Clustering (Optional):** If `bow_results_suffix` is defined in the config, creates a Bag-of-Words representation (`BoWClusterer` from `bow.py`), applies K-Means clustering, reduces dimensions using SVD+t-SNE (`reduce_and_visualize` from `bow.py`), and saves intermediate results.
-4.  **TF-IDF Clustering:** Creates a TF-IDF representation (`TfidfClusterer` from `bow.py`), applies K-Means clustering, reduces dimensions using SVD+t-SNE, saves the fitted TF-IDF vectorizer, and saves the final combined results (including BoW results if generated).
-5.  **Analysis & Visualization:** The script performs basic analysis by plotting the TF-IDF t-SNE results (if generated) using matplotlib/seaborn and sampling quotes from each TF-IDF cluster.
+## Experiment Goal
+
+The primary goal of _this_ specific experiment is to:
+
+1.  Preprocess raw quote text.
+2.  Generate BoW and TF-IDF vector representations of the quotes.
+3.  Apply K-Means clustering to group similar quotes based on these representations.
+4.  Reduce dimensionality using SVD and visualize the clusters using t-SNE.
+5.  Save the preprocessing steps, trained vectorizers, cluster assignments, and visualizations for analysis and potential reuse.
 
 ## Setup and Execution
 
-1.  **Environment:** Ensure you have a Python environment with the necessary libraries installed (e.g., pandas, scikit-learn, matplotlib, seaborn, pyarrow, joblib, pyyaml). Refer to the project's main requirements file if available.
+1.  **Environment:** Ensure you have set up the Python environment for the main `aalto_snlp_2025_project` by navigating to the **repository root** and installing dependencies defined in `pyproject.toml`. This is typically done using `poetry install` or potentially `pip install .` if using pip directly.
 2.  **Configuration:**
-    - Edit `experiment.yaml` to specify:
-      - `raw_data_file`: Path to the input CSV file (must contain a 'quote' column).
-      - `intermediate_dir`: Directory to save processed data and model objects.
-      - `preprocessed_file_suffix`: Suffix for the preprocessed data file.
-      - `bow_results_suffix`: (Optional) Suffix for the BoW intermediate results. If commented out or removed, the BoW stage is skipped.
-      - `tfidf_results_suffix`: Suffix/path for the final results file (containing TF-IDF, t-SNE, and optionally BoW data).
-      - `n_clusters`: Number of clusters for K-Means.
-      - `n_svd_components`: Number of components for SVD dimensionality reduction before t-SNE.
-      - `vectorizer_min_df`, `vectorizer_max_df`: Parameters for CountVectorizer/TfidfVectorizer.
-      - `n_samples_per_cluster`: Number of sample quotes to print per cluster during analysis.
-      - `random_state`: Seed for reproducibility.
-3.  **Run the Pipeline:** Execute the main script from the root directory:
+    - The configuration for this experiment is managed in `experiments/BOW/experiment.yaml`.
+    - Edit `experiment.yaml` to specify necessary parameters:
+      - `raw_data_file`: Path to the input CSV file (e.g., located in the root `data/` directory). Must contain a 'quote' column. Paths should be specified relative to the **repository root** or as absolute paths.
+      - `intermediate_dir`: Directory where all outputs specific to _this experiment_ (processed data, models, results) will be saved. It is recommended to keep this within the experiment's directory (e.g., `experiments/BOW/intermediate_data`). Paths should be relative to the **repository root**.
+      - `preprocessed_file_suffix`: File suffix for the saved preprocessed data within `intermediate_dir`.
+      - `bow_results_suffix`: (Optional) File suffix for BoW-specific intermediate results. Comment out or remove this key to skip the BoW part of the pipeline.
+      - `tfidf_results_suffix`: File suffix for the final results Parquet file (containing TF-IDF clusters, t-SNE coordinates, and optionally BoW results).
+      - `n_clusters`, `n_svd_components`: Parameters for K-Means and SVD.
+      - `vectorizer_min_df`, `vectorizer_max_df`: Parameters for `CountVectorizer` and `TfidfVectorizer`.
+      - `n_samples_per_cluster`: Number of sample quotes to print per cluster during the analysis phase.
+      - `random_state`: Seed for reproducibility across runs.
+3.  **Run the Experiment:** Execute the main script for this experiment from the **repository root**:
     ```bash
     python experiments/BOW/main.py
     ```
-    The script will print progress messages and save intermediate/final files to the specified `intermediate_dir`.
+    The script will print progress messages and save all outputs to the configured `intermediate_dir`.
 
 ## Outputs
 
-The script generates the following key outputs in the `intermediate_dir` (or as specified in `experiment.yaml`):
+This experiment generates the following key files within the specified `intermediate_dir`:
 
-- **Preprocessed Data:** e.g., `data_preprocessed.parquet` (contains original data + `processed_quote` column).
-- **Text Preprocessor:** `text_preprocessor.joblib` (saved `TextPreprocessor` object).
-- **BoW Results (Optional):** e.g., `data_bow_tsne.parquet` (if `bow_results_suffix` is configured).
-- **TF-IDF Vectorizer:** `tfidf_vectorizer.joblib` (saved fitted `TfidfVectorizer` object).
-- **Final Results:** e.g., `data_tfidf_tsne.parquet` (defined by `tfidf_results_suffix`). This is the primary output containing original data, processed text, cluster assignments, and t-SNE coordinates.
+- **Preprocessed Data:** e.g., `intermediate_data/data_preprocessed.parquet`. Contains original data plus the `processed_quote` column generated by `TextPreprocessor`.
+- **Text Preprocessor:** e.g., `intermediate_data/text_preprocessor.joblib`. The saved `TextPreprocessor` object used for cleaning text in this experiment. Essential for consistent processing of new data/queries relative to this experiment's results.
+- **BoW Results (Optional):** e.g., `intermediate_data/data_bow_tsne.parquet`. Contains BoW cluster IDs and t-SNE coordinates if `bow_results_suffix` was configured.
+- **TF-IDF Vectorizer:** e.g., `intermediate_data/tfidf_vectorizer.joblib`. The saved, fitted `TfidfVectorizer` object. Crucial for transforming new text into the vector space learned in this experiment.
+- **Final Results:** e.g., `intermediate_data/data_tfidf_tsne.parquet`. The primary output, containing original data, processed text, `tfidf_cluster` assignments, `tsne_tfidf_*` coordinates, and potentially BoW results (`bow_cluster`, `tsne_bow_*`).
 
-## Key Output for Query Engine
+## Using Experiment Outputs
 
-The primary output file relevant for building a query engine is the final results file specified by `tfidf_results_suffix` in `experiment.yaml` (e.g., `intermediate_data/data_tfidf_tsne.parquet`).
+The outputs from this experiment can be used for various purposes:
 
-This Parquet file contains the processed data along with cluster assignments and embeddings. Key columns include:
+1.  **Analysis:** Analyze the cluster quality, visualize the t-SNE plots, and examine sample quotes per cluster provided in the output logs and the final results file.
+2.  **Comparison:** Compare the clustering results (e.g., silhouette scores, visual separation) with those from other experiments (`word2vec`, `BERT`).
+3.  **Downstream Integration:** Use the final results Parquet file and the saved `tfidf_vectorizer.joblib` and `text_preprocessor.joblib` as inputs for other processes. For instance, the cluster IDs could serve as categorical features, or the vectorizer could be used to embed new queries for similarity search within the context of this TF-IDF space.
 
-- `quote`: The original quote text.
-- `processed_quote`: The cleaned and processed version of the quote used for vectorization and clustering.
-- `bow_cluster` (Optional): The cluster ID assigned by K-Means based on BoW.
-- `tfidf_cluster`: The cluster ID assigned by K-Means based on TF-IDF. **(Likely the most useful for semantic querying)**.
-- `tsne_bow_1`, `tsne_bow_2` (Optional): 2D t-SNE coordinates based on BoW.
-- `tsne_tfidf_1`, `tsne_tfidf_2`: 2D t-SNE coordinates based on TF-IDF.
-- _(Other original columns from the input CSV might also be present)_
+### Embedding a New Query (Example)
 
-## Embed a New Query
+To transform a new query using the artifacts generated by _this specific run_ of the experiment:
 
-To find quotes similar to a new query or to determine its potential cluster, you need to transform the query using the saved preprocessor and TF-IDF vectorizer:
+```python
+import joblib
+import os
 
-1.  Load the preprocessor: `preprocessor = joblib.load('intermediate_data/text_preprocessor.joblib')`
-2.  Load the vectorizer: `vectorizer = joblib.load('intermediate_data/tfidf_vectorizer.joblib')`
-3.  Preprocess the raw query text: `processed_query = preprocessor.transform([raw_query])[0]`
-4.  Vectorize the processed query: `query_vector = vectorizer.transform([processed_query])`
+# --- Configuration (Should match experiment.yaml) ---
+# Example: Assume intermediate_dir was set to 'experiments/BOW/intermediate_data' in experiment.yaml
+# Paths are relative to the repository root.
+INTERMEDIATE_DIR = 'experiments/BOW/intermediate_data'
+PREPROCESSOR_FILENAME = 'text_preprocessor.joblib' # Match the saved object name
+VECTORIZER_FILENAME = 'tfidf_vectorizer.joblib' # Match the saved object name
+# --- ---
 
-The resulting `query_vector` (a sparse matrix) represents the query in the same TF-IDF space as the original quotes.
+# Construct full paths
+preprocessor_path = os.path.join(INTERMEDIATE_DIR, PREPROCESSOR_FILENAME)
+vectorizer_path = os.path.join(INTERMEDIATE_DIR, VECTORIZER_FILENAME)
 
-## Building a Query Engine (Suggestions)
+# Load the specific preprocessor and vectorizer from this experiment
+try:
+    preprocessor = joblib.load(preprocessor_path)
+    vectorizer = joblib.load(vectorizer_path)
+except FileNotFoundError:
+    print(f"Error: Ensure the experiment has been run and artifacts exist in {INTERMEDIATE_DIR}")
+    # Handle error appropriately
+    exit()
 
-The cluster assignments provide a way to group semantically similar quotes. Here are some ideas for leveraging the `tfidf_cluster` column:
 
-1.  **Keyword Search within Clusters:**
+# New query
+raw_query = "Find wisdom in unexpected places."
 
-    - Allow users to search for keywords.
-    - Instead of searching the entire dataset, first identify which clusters contain quotes relevant to the keywords (e.g., by searching the `processed_quote` text within each cluster or using the query vector).
-    - Return results primarily from the most relevant cluster(s).
+# 1. Preprocess the query using the *loaded* preprocessor
+processed_query = preprocessor.transform([raw_query])[0] # transform expects a list
 
-2.  **Find Similar Quotes:**
+# 2. Vectorize the processed query using the *loaded* TF-IDF vectorizer
+query_vector = vectorizer.transform([processed_query]) # transform expects a list
 
-    - Given a specific quote ID or text, find its `tfidf_cluster`.
-    - Retrieve other quotes belonging to the _same_ `tfidf_cluster`.
-    - Alternatively, calculate cosine similarity between the `query_vector` and the TF-IDF vectors of all documents (requires loading/calculating the document matrix).
+# Now 'query_vector' (a sparse matrix) represents the query in the TF-IDF space
+# learned during this experiment. It can be used for:
+# - Finding the closest cluster centroid (if K-Means model was also saved)
+# - Calculating cosine similarity against vectors in the final results Parquet file
+print(f"Raw Query: '{raw_query}'")
+print(f"Processed Query: '{processed_query}'")
+print(f"Query Vector Shape: {query_vector.shape}")
+print(f"Query Vector (TF-IDF):\\n{query_vector}")
 
-3.  **Cluster Exploration:**
-    - Allow users to browse quotes belonging to a specific `tfidf_cluster` ID.
-    - Provide representative quotes or keywords for each cluster.
+```
 
-**Implementation Notes:**
-
-- Use a library like `pandas` or `pyarrow` to efficiently read the Parquet file(s).
-- Consider indexing the `tfidf_cluster` column for faster lookups.
-- The `processed_quote` column is useful for text matching after cleaning.
+This revised README provides more context, clarifies path handling, and gives a more robust example for using the experiment's outputs. Let me know if you'd like further refinements!

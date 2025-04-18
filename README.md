@@ -1,8 +1,10 @@
 # aalot_snlp_2025_project
+
 Project repository for the Aalto 2025 SNLP course
 
 Data structure:
-````
+
+```
 .
 ├── BERT
 │   ├── embeddings
@@ -28,3 +30,4 @@ Data structure:
 └── word2vec
     ├── quotes_with_clusters.csv
     └── quotes_with_vectors.csv
+```
