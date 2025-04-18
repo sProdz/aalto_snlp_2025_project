@@ -53,4 +53,4 @@ The outputs from this experiment can be used for various purposes:
 
 1.  **Analysis:** Analyze the cluster quality, visualize the t-SNE plots, and examine sample quotes per cluster provided in the output logs and the final results file.
 2.  **Comparison:** Compare the clustering results (e.g., silhouette scores, visual separation) with those from other experiments (`word2vec`, `BERT`).
-3.  **Downstream Integration:** Use the final results Parquet file and the saved `tfidf_vectorizer.joblib` and `text_preprocessor.joblib` as inputs for other processes. For instance, the cluster IDs could serve as categorical features, or the vectorizer could be used to embed new queries for similarity search within the context of this TF-IDF space.
+3.  **Downstream Integration:** Use the final results Parquet file and the saved `tfidf_vectorizer.joblib` and `text_preprocessor.joblib` as inputs for other processes. For instance, the cluster IDs could serve as categorical features, or the vectorizer could be used to transform text data consistently according to the TF-IDF space defined by this experiment.
