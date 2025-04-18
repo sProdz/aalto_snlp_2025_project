@@ -1,0 +1,6 @@
+csv_path: "data/BERT/embeddings/embeddings_vanilla_bert.csv"
+nrows: 1000
+n_clusters: 5
+pca_components: 50
+tsne_perplexity: 15
+random_state: 42
