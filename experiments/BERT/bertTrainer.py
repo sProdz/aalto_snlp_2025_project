@@ -13,7 +13,7 @@ def load_quotes_with_pandas():
     Load quotes from the SQLite database using pandas.
     Limits the number of quotes to 50 for testing purposes.
     """
-    conn = sqlite3.connect("quotes.sqlite")
+    conn = sqlite3.connect("data/quotes/quotes.sqlite")
     df = pd.read_sql_query("SELECT * FROM quotes", conn)
     conn.close()
     return df

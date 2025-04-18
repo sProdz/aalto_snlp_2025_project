@@ -31,7 +31,7 @@ def main(config_path):
         sys.exit(1)
 
     # Extract config values with defaults
-    csv_path = config.get("csv_path", "./embeddings_vanilla_bert.csv")
+    csv_path = config.get("csv_path", "data/BERT/embeddings/embeddings_tuned_bert.csv")
     nrows = config.get("nrows", 1000)
     n_clusters = config.get("n_clusters", 10)
     pca_components = config.get("pca_components", 50)
@@ -125,7 +125,4 @@ def main(config_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        logger.error("Usage: python %s <config.yaml>", sys.argv[0])
-        sys.exit(1)
-    main(sys.argv[1])
+    main("experiments/BERT/bert_visualization_settings.yaml")

@@ -12,7 +12,7 @@ nopee selitys mitä kaikki kolme scriptia tekee
 
 You can edit the amount of clusters, number of rows read from the csv and more from the bert_visualization_settings.yaml file.
 run the visualizer with 
-```python visualize_bert_clusters.py bert_visualization_settings.yaml```
+```python visualize_bert_clusters.py```
 
 OBS! Kestää ikuisuus jos lataa koko csv tiedoston.
 
