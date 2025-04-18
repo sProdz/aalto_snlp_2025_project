@@ -271,7 +271,8 @@ else:
 
 print(f"Shape after TF-IDF stage: {df_final.shape}")
 print("Final DataFrame columns:", df_final.columns.tolist())
-print(df_final[['processed_quote', 'bow_cluster', 'tfidf_cluster', 'tsne_bow_1', 'tsne_tfidf_1']].head())
+# Print head, excluding the BoW columns which might not exist if BoW stage was skipped
+print(df_final[['processed_quote', 'tfidf_cluster', 'tsne_tfidf_1', 'tsne_tfidf_2']].head())
 
 
 # In[ ]:
