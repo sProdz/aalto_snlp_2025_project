@@ -1,0 +1,37 @@
+[project]
+name = "aalto-snlp-2025-project"
+version = "0.1.0"
+description = "SNLP 2025 group project repo"
+authors = [
+    {name = "arturskwarek",email = "artur@emblica.fi"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+package-mode = false
+
+dependencies = [
+    "pandas (>=2.2.3,<3.0.0)",
+    "numpy (>=1.26,<2.0)",
+    "torch (>=2.6.0,<3.0.0)",
+    "transformers (>=4.51.3,<5.0.0)",
+    "scikit-learn (>=1.6.1,<2.0.0)",
+    "matplotlib (>=3.10.1,<4.0.0)",
+    "pyyaml (>=6.0.2,<7.0.0)",
+    "logging (>=0.4.9.6,<0.5.0.0)",
+    "seaborn (>=0.13.2,<0.14.0)",
+    "joblib (>=1.4.2,<2.0.0)",
+    "qdrant-client (<1.13.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "pyarrow (>=19.0.1,<20.0.0)",
+    "gensim (>=4.3.3,<5.0.0)",
+    "nltk (>=3.9.1,<4.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
