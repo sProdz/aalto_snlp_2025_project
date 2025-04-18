@@ -3,11 +3,11 @@
 # TSNE is memory bound so running with GPU is likely not going to make it faster
 
 # --- File Paths (Relative to project root when running main.py from root) ---
-raw_data_file: "data/quotes.csv" # Changed path relative to project root
+raw_data_file: "data/quotes/quotes.csv"
 intermediate_dir: "data/BOW_intermediate" # Changed path relative to project root
 preprocessed_file_suffix: "_preprocessed.parquet" # Suffix for files saved in intermediate_dir
 # bow_results_suffix: "_bow_tsne.parquet" # Commented out as only TF-IDF is needed
-tfidf_results_suffix: "data/BOW_results/tfidf_tsne.parquet" # Final results path relative to project root
+tfidf_results_suffix: "data/BOW/data_tfidf_tsne.parquet" # Final results path relative to project root
 
 # --- Processing Parameters ---
 n_clusters: 10

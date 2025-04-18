@@ -12,71 +12,82 @@ import csv
 import yaml
 import sys
 
-# Import custom classes from bow.py using relative import
-script_dir = os.path.dirname(os.path.abspath(__file__))
-# Add the script's directory to sys.path to allow relative imports
-if script_dir not in sys.path:
-    sys.path.append(script_dir)
+# Determine the project root directory dynamically for data path resolution
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+# No longer need to add PROJECT_ROOT to sys.path for these imports
+
+# Import custom classes from bow.py (located in the same directory)
 from bow import TextPreprocessor, BoWClusterer, TfidfClusterer, reduce_and_visualize
 
 
-# --- Load Configuration from YAML ---
-CONFIG_FILE = os.path.join(script_dir, 'experiment.yaml') # Path relative to script
-try:
-    with open(CONFIG_FILE, 'r') as f:
-        config = yaml.safe_load(f)
-    print(f"Loaded configuration from {CONFIG_FILE}")
-except FileNotFoundError:
-    print(f"ERROR: Configuration file '{CONFIG_FILE}' not found. Using default fallback values.")
-    # Define fallback defaults if config file is missing
-    config = {
-        'raw_data_file': 'quotes.csv',
-        'intermediate_dir': 'intermediate_data',
-        'preprocessed_file_suffix': '_preprocessed.parquet',
-        'bow_results_suffix': '_bow_tsne.parquet',
-        'tfidf_results_suffix': '_tfidf_tsne.parquet',
-        'n_clusters': 10,
-        'n_svd_components': 100,
-        'random_state': 42,
-        'vectorizer_min_df': 0.001,
-        'vectorizer_max_df': 0.95,
-        'n_samples_per_cluster': 3
-    }
-except Exception as e:
-    print(f"Error loading configuration from {CONFIG_FILE}: {e}")
-    raise # Stop execution if YAML is invalid or unreadable
+# --- Configuration Loading ---
 
-# --- Use Configuration Values ---
-RAW_DATA_FILE = config['raw_data_file']
-INTERMEDIATE_DIR = config['intermediate_dir']
+def load_config(config_path='experiment.yaml'):
+    """Loads configuration from a YAML file."""
+    if not os.path.isabs(config_path): # Handle relative config path
+        config_path = os.path.join(os.path.dirname(__file__), config_path)
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        print(f"Loaded configuration from {config_path}")
+        return config
+    except FileNotFoundError:
+        print(f"ERROR: Configuration file not found at {config_path}")
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        print(f"ERROR: Failed to parse configuration file {config_path}: {e}")
+        sys.exit(1)
 
-# Construct intermediate file paths dynamically based on config
-PREPROCESSED_FILE = os.path.join(INTERMEDIATE_DIR, f"data{config['preprocessed_file_suffix']}")
+# Load config
+config = load_config()
 
-# Get BoW suffix safely, defaulting to None if not specified in config
-bow_suffix = config.get('bow_results_suffix', None)
-BOW_RESULTS_FILE = os.path.join(INTERMEDIATE_DIR, f"data{bow_suffix}") if bow_suffix else None
+# --- Extract Configuration Values ---
+# File Paths (Make paths absolute relative to project root)
+RAW_DATA_FILE = os.path.join(PROJECT_ROOT, config['raw_data_file'])
+INTERMEDIATE_DIR = os.path.join(PROJECT_ROOT, config['intermediate_dir'])
+os.makedirs(INTERMEDIATE_DIR, exist_ok=True) # Ensure intermediate directory exists
 
-# Construct TF-IDF path using the dedicated key from YAML
-TFIDF_RESULTS_FILE = config['tfidf_results_suffix'] # Assuming this is a full path in YAML
+PREPROCESSED_FILE_SUFFIX = config['preprocessed_file_suffix']
+# Construct full path for preprocessed file
+# Use filename from RAW_DATA_FILE without extension
+raw_filename_no_ext = os.path.splitext(os.path.basename(config['raw_data_file']))[0]
+PREPROCESSED_FILE = os.path.join(INTERMEDIATE_DIR, f"{raw_filename_no_ext}{PREPROCESSED_FILE_SUFFIX}")
 
-# Ensure intermediate directories exist
-os.makedirs(INTERMEDIATE_DIR, exist_ok=True)
-tfidf_parent_dir = os.path.dirname(TFIDF_RESULTS_FILE)
-os.makedirs(tfidf_parent_dir, exist_ok=True)
 
+# BOW_RESULTS_SUFFIX is commented out in YAML, handle optional config
+BOW_RESULTS_SUFFIX = config.get('bow_results_suffix') # Use .get() for safety
+BOW_RESULTS_FILE = None # Initialize to None
+if BOW_RESULTS_SUFFIX:
+    # Construct full path if suffix is provided
+    bow_filename_no_ext = os.path.splitext(os.path.basename(config['raw_data_file']))[0] # Or derive from intermediate?
+    BOW_RESULTS_FILE = os.path.join(PROJECT_ROOT, BOW_RESULTS_SUFFIX.replace("{filename}", bow_filename_no_ext)) # Assume suffix might need filename
+    # Ensure directory exists if BoW results are enabled
+    bow_results_dir = os.path.dirname(BOW_RESULTS_FILE)
+    if bow_results_dir: # Check if directory part exists
+        os.makedirs(bow_results_dir, exist_ok=True)
+
+
+TFIDF_RESULTS_PATH = os.path.join(PROJECT_ROOT, config['tfidf_results_suffix']) # Renamed variable for clarity
+TFIDF_RESULTS_FILE = TFIDF_RESULTS_PATH # Keep consistent naming if needed elsewhere
+# Ensure directory exists for TF-IDF results
+tfidf_results_dir = os.path.dirname(TFIDF_RESULTS_FILE)
+if tfidf_results_dir: # Check if directory part exists
+    os.makedirs(tfidf_results_dir, exist_ok=True)
+
+
+# Processing Parameters
 N_CLUSTERS = config['n_clusters']
-N_SVD_COMPONENTS = config['n_svd_components']
-RANDOM_STATE = config.get('random_state', 42) # Use .get for optional keys with defaults
+N_SVD_COMPONENTS = config.get('n_svd_components', 100) # Default if missing
+RANDOM_STATE = config.get('random_state', 42) # Default if missing
 
-# Define vectorizer parameters from config
+# Vectorizer Parameters (Pass as a dictionary)
 VECTORIZER_PARAMS = {
-    'min_df': config['vectorizer_min_df'],
-    'max_df': config['vectorizer_max_df']
+    'min_df': config.get('vectorizer_min_df', 0.001),
+    'max_df': config.get('vectorizer_max_df', 0.95)
 }
 
-# Define analysis parameters from config
-N_SAMPLES_PER_CLUSTER = config['n_samples_per_cluster']
+# Analysis Parameters
+N_SAMPLES_PER_CLUSTER = config.get('n_samples_per_cluster', 3)
 
 
 # Set pandas display options
@@ -85,8 +96,15 @@ pd.set_option('display.max_rows', config.get('display_max_rows', 100))
 
 
 print("--- Configuration Loaded ---")
+print(f"Project Root: {PROJECT_ROOT}") # Added for debugging
 print(f"Raw Data: {RAW_DATA_FILE}")
 print(f"Intermediate Dir: {INTERMEDIATE_DIR}")
+print(f"Preprocessed File: {PREPROCESSED_FILE}")
+if BOW_RESULTS_FILE:
+    print(f"BoW Results File: {BOW_RESULTS_FILE}")
+else:
+    print("BoW Results File: Not configured (skipped)")
+print(f"TF-IDF Results File: {TFIDF_RESULTS_FILE}")
 print(f"N Clusters: {N_CLUSTERS}")
 print(f"N SVD Components: {N_SVD_COMPONENTS}")
 print(f"Vectorizer Params: {VECTORIZER_PARAMS}")
