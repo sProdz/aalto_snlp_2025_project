@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.2.2
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  ingest:
+    image: python:3.10-slim
+    depends_on:
+      - qdrant
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command: >
+      bash -lc "pip install qdrant-client pandas tqdm joblib scikit-learn scipy pyarrow && python qdrant_ingest.py"
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      BERT_CSV: data/BERT/embeddings/embeddings_tuned_bert.csv
+      W2V_CSV_PATH: data/word2vec/quotes_with_vectors.csv
+      BOW_PARQUET_PATH: data/BOW/data_tfidf_tsne.parquet
+      BERT_COLLECTION: bert_embeddings
+      W2V_COLLECTION: w2v_embeddings
+      BOW_COLLECTION: bow_embeddings
+      BATCH_SIZE: 500
+
+volumes:
+  qdrant_storage:
+    driver: local
