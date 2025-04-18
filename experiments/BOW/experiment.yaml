@@ -1,0 +1,27 @@
+# Configuration for Goodreads Quote Clustering Pipeline.
+# !Note that the whole processing using the full dataset with CPU multithreading will likely take a long time (Macbook air using 8 cores +45 minutes).
+# TSNE is memory bound so running with GPU is likely not going to make it faster
+
+# --- File Paths ---
+raw_data_file: "quotes.csv"
+intermediate_dir: "intermediate_data"
+preprocessed_file_suffix: "_preprocessed.parquet"
+bow_results_suffix: "_bow_tsne.parquet"
+tfidf_results_suffix: "_tfidf_tsne.parquet" # Final results
+
+# --- Processing Parameters ---
+n_clusters: 10
+n_svd_components: 100
+random_state: 42 # For reproducibility in sampling/t-SNE
+
+# --- Vectorizer Parameters (Optional: Add more specific ones if needed) ---
+# These apply to both BoW and TF-IDF unless overridden
+vectorizer_min_df: 0.001
+vectorizer_max_df: 0.95
+
+# --- Analysis Parameters ---
+n_samples_per_cluster: 3
+# --- Display Options (Less common to configure via YAML, but possible) ---
+# display_max_colwidth: 100
+# display_max_rows: 100
+
