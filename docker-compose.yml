@@ -24,6 +24,7 @@ services:
       BERT_COLLECTION: bert_embeddings
       W2V_COLLECTION: w2v_embeddings
       BOW_COLLECTION: bow_embeddings
+      MAX_POINTS: 100  # Maximum 345000
       BATCH_SIZE: 500
 
 volumes:

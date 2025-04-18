@@ -19,6 +19,7 @@ def ingest_bow(
     client: QdrantClient,
     collection_name: str,
     batch_size: int,
+    total_limit: int,
 ) -> None:
     """Load preprocessed quotes from Parquet, vectorize with TF-IDF, and upsert into Qdrant."""
     vect_path = os.getenv("BOW_VECTORIZER_PATH", "data/BOW/tfidf_vectorizer.joblib")
@@ -46,12 +47,15 @@ def ingest_bow(
 
     # Transform text into TF-IDF embeddings
     tfidf_matrix = vectorizer.transform(df["processed_quote"])
-    total = len(df)
 
-    pbar = tqdm(total=total, desc=f"BOW → {collection_name}", unit="pts")
+    pbar = tqdm(total=total_limit, desc=f"BOW → {collection_name}", unit="pts")
     points: list[PointStruct] = []
 
     for i, idx in enumerate(df.index):
+
+        if i >= total_limit:
+            break
+
         emb = tfidf_matrix[i].toarray().ravel().tolist()
         payload = {"quote": df.at[idx, "quote"]}
         points.append(PointStruct(id=int(idx), vector=emb, payload=payload))
@@ -76,17 +80,18 @@ def ingest_w2v(
     client: QdrantClient,
     collection_name: str,
     batch_size: int,
+    total_limit: int,
 ) -> None:
     """Stream CSV of Word2Vec embeddings and upsert into Qdrant."""
-    FIXED_TOTAL = 345013
     try:
         reader = pd.read_csv(csv_path, usecols=["quote", "vector"], chunksize=chunksize)
     except Exception as e:
         logger.error("Cannot read W2V CSV %s: %s. Skipping W2V ingest.", csv_path, e)
         return
 
-    pbar = tqdm(total=FIXED_TOTAL, desc=f"{name} → {collection_name}", unit="rows")
+    pbar = tqdm(total=total_limit, desc=f"{name} → {collection_name}", unit="rows")
     offset = 0
+    ingested = 0
     points: list[PointStruct] = []
 
     for chunk in reader:
@@ -102,6 +107,14 @@ def ingest_w2v(
                 client.upsert(collection_name=collection_name, points=points)
                 pbar.update(len(points))
                 points = []
+
+            ingested += 1
+
+            if ingested >= total_limit:
+                break
+
+        if ingested >= total_limit:
+            break
         offset += len(chunk)
 
     if points:
@@ -120,9 +133,9 @@ def ingest_bert(
     client: QdrantClient,
     collection_name: str,
     batch_size: int,
+    total_limit: int,
 ) -> None:
     """Stream CSV of precomputed BERT embeddings and upsert into Qdrant."""
-    FIXED_TOTAL = 345013
     try:
         reader = pd.read_csv(
             csv_path, usecols=["quote", "embedding"], chunksize=chunksize
@@ -131,8 +144,9 @@ def ingest_bert(
         logger.error("Cannot read BERT CSV %s: %s. Skipping BERT ingest.", csv_path, e)
         return
 
-    pbar = tqdm(total=FIXED_TOTAL, desc=f"{name} → {collection_name}", unit="rows")
+    pbar = tqdm(total=total_limit, desc=f"{name} → {collection_name}", unit="rows")
     offset = 0
+    ingested = 0
     points: list[PointStruct] = []
 
     for chunk in reader:
@@ -148,6 +162,14 @@ def ingest_bert(
                 client.upsert(collection_name=collection_name, points=points)
                 pbar.update(len(points))
                 points = []
+
+            ingested += 1
+
+            if ingested >= total_limit:
+                break
+
+        if ingested >= total_limit:
+            break
         offset += len(chunk)
 
     if points:
@@ -171,6 +193,7 @@ def main():
     qdrant_url = os.getenv("QDRANT_URL", "http://qdrant:6333")
     batch_size = int(os.getenv("BATCH_SIZE", "500"))
     csv_chunksize = int(os.getenv("CSV_CHUNKSIZE", batch_size))
+    total_limit = int(os.getenv("MAX_POINTS", "345000"))
 
     paths = {
         "BERT": os.getenv("BERT_CSV", "data/BERT/embeddings/embeddings_tuned_bert.csv"),
@@ -245,11 +268,15 @@ def main():
 
         # Call ingest function
         if name == "BERT":
-            ingest_bert(log, name, path, csv_chunksize, client, coll, batch_size)
+            ingest_bert(
+                log, name, path, csv_chunksize, client, coll, batch_size, total_limit
+            )
         elif name == "Word2Vec":
-            ingest_w2v(log, name, path, csv_chunksize, client, coll, batch_size)
+            ingest_w2v(
+                log, name, path, csv_chunksize, client, coll, batch_size, total_limit
+            )
         else:
-            ingest_bow(log, path, client, coll, batch_size)
+            ingest_bow(log, path, client, coll, batch_size, total_limit)
 
     logger.info("All ingestions complete.")
 
